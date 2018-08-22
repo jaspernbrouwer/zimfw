@@ -1,26 +1,118 @@
 #
-# Purinimal theme
-# https://github.com/jaspernbrouwer/...
+# Purinimal (a prompt theme)
+# https://github.com/jaspernbrouwer/purinimal
 #
-# Based on these popular themes
+# Combination of these popular themes:
 # - Pure (https://github.com/sindresorhus/pure)
 # - Minimal (https://github.com/S1cK94/minimal)
 #
-# Requires the `git-info` zmodule to be included in the .zimrc file
+# Requires the `git-info` zmodule to be included in the .zimrc file.
 #
 
-pp_user() {
-  # Red when user is privileged
-  print -n '%(!.%F{red}.%f)❯'
+purinimal_preprompt_env() {
+  setopt localoptions noshwordsplit
+
+  # Check SSH_CONNECTION and the current state.
+  local ssh_connection=${SSH_CONNECTION:-${PROMPT_PURE_SSH_CONNECTION}}
+
+  if [[ -z ${ssh_connection} ]] && (( ${+commands[who]} )); then
+    # When changing user on a remote system, the SSH_CONNECTION environment variable can be lost,
+    # attempt detection via who.
+    local who_out
+    who_out=$(who -m 2>/dev/null)
+    if (( $? )); then
+      # Who am I not supported, fallback to plain who.
+      who_out=$(who 2>/dev/null | grep ${TTY#/dev/})
+    fi
+
+    # Simplified, only checks partial pattern.
+    local reIPv6="(([0-9a-fA-F]+:)|:){2,}[0-9a-fA-F]+"
+    # Simplified, allows invalid ranges.
+    local reIPv4="([0-9]{1,3}\.){3}[0-9]+"
+    # Assume two non-consecutive periods represents a hostname.
+    local reHostname="([.][^. ]+){2}"
+
+    # Usually the remote address is surrounded by parenthesis, but not on all systems
+    # (e.g. busybox).
+    local -H MATCH MBEGIN MEND
+    if [[ ${who_out} =~ "\(?(${reIPv4}|${reIPv6}|${reHostname})\)?\$" ]]; then
+      ssh_connection=${MATCH}
+
+      # Export variable to allow detection propagation inside shells spawned by this one
+      # (e.g. tmux does not always inherit the same tty, which breaks detection).
+      export PROMPT_PURE_SSH_CONNECTION=${ssh_connection}
+    fi
+    unset MATCH MBEGIN MEND
+  fi
+
+  # Check if we should display the VIRTUAL_ENV, we use a sufficiently high index of psvar (12)
+  # here to avoid collisions with user defined entries.
+  # When VIRTUAL_ENV_DISABLE_PROMPT is empty, it was unset by the user and we should take back
+  # control.
+  psvar[12]=
+  if [[ -n ${VIRTUAL_ENV} ]] && [[ -z ${VIRTUAL_ENV_DISABLE_PROMPT} || ${VIRTUAL_ENV_DISABLE_PROMPT} = 12 ]]; then
+    psvar[12]="${VIRTUAL_ENV:t}"
+    export VIRTUAL_ENV_DISABLE_PROMPT=12
+  fi
+
+  # Check if we need to show username, hostname and/or VIRTUAL_ENV.
+  local -a preprompt_env
+
+  # Show username if root or logged in through SSH.
+  if [[ ${UID} -eq 0 ]] || [[ -n ${ssh_connection} ]]; then
+    preprompt_env+=("%(!.%F{red}%n%f.%n)")
+  fi
+
+  # Show hostname if logged in through SSH.
+  [[ -n ${ssh_connection} ]] && preprompt_env+=("%F{green}%m%f")
+
+  # Show VIRTUAL_ENV if it is activated.
+  [[ -n ${psvar[12]} ]] && preprompt_env+=("%F{yellow}%12v%f")
+
+  # Only print when there's something to show.
+  [ ${#preprompt_env[@]} -ne 0 ] && print -n "${(j. .)preprompt_env} "
 }
 
-pp_jobs() {
-  # Cyan when background processes are running
-  print -n '%(1j.%F{cyan}.%f)❯'
+purinimal_preprompt_path() {
+  # Calculate length of the "env" and "git" preprompt parts.
+  local zero='%([BSUbfksu]|([FK]|){*})'
+  local preprompt_env_length=${#${(S%%)1//${~zero}/}}
+  local preprompt_git_length=${#${(S%%)2//${~zero}/}}
+
+  # Print path, truncate it if needed.
+  print -n "%F{blue}%$((COLUMNS-${preprompt_env_length}-3-${preprompt_git_length}))<…<%~%<<%f"
 }
 
-pp_vimode() {
-  # Blue when in vi mode
+purinimal_preprompt_padding() {
+  local zero='%([BSUbfksu]|([FK]|){*})'
+  local preprompt_env_length=${#${(S%%)1//${~zero}/}}
+  local preprompt_path_length=${#${(S%%)2//${~zero}/}}
+  local preprompt_git_length=${#${(S%%)3//${~zero}/}}
+
+  # Print padding for between env + path and git
+  print -n ${(r:$((COLUMNS-${preprompt_env_length}-${preprompt_path_length}-${preprompt_git_length})):)}
+}
+
+purinimal_preprompt_git() {
+  # Fetch git-info.
+  (( ${+functions[git-info]} )) && git-info
+
+  # Print git-info when inside a git working copy.
+  [[ -n ${git_info} ]] && print -n " ${(e)git_info[prompt]}"
+}
+
+purinimal_mark_user() {
+  # Red when user is privileged.
+  print -n "%(!.%F{red}.%f)${PURINIMAL_MARK:-❯}"
+}
+
+purinimal_mark_jobs() {
+  # Cyan when background processes are running.
+  print -n "%(1j.%F{cyan}.%f)${PURINIMAL_MARK:-❯}"
+}
+
+purinimal_mark_vimode() {
+  # Blue when in vi mode.
   local color
 
   case ${KEYMAP} in
@@ -32,109 +124,58 @@ pp_vimode() {
       ;;
   esac
 
-  print -n "${color}❯"
+  print -n "${color}${PURINIMAL_MARK:-❯}"
 }
 
-pp_status() {
-  # Green when exit code is 0, red otherwise
-  print -n '%(0?.%F{green}.%F{red})❯'
+purinimal_mark_exitcode() {
+  # Green when exit code is 0, red otherwise.
+  print -n "%(0?.%F{green}.%F{red})${PURINIMAL_MARK:-❯}"
 }
 
-pp_hostinfo() {
-  local -a pp_hostinfo
-
-  # When in a SSH session, include username (red when privileged) and hostname (green)
-  [[ -n ${SSH_CONNECTION} ]] && pp_hostinfo=(${pp_hostinfo} "%(!.%F{red}%n%f.%n) %F{green}%m%f")
-
-  # When active, include virtualenv (yellow)
-  [[ -n ${psvar[12]} ]] && pp_hostinfo=(${pp_hostinfo} "%F{yellow}%12v%f")
-
-  # Only print when there's something to show
-  [ ${#pp_hostinfo[@]} -ne 0 ] && print -n "${(j. .)pp_hostinfo} "
-}
-
-pp_git() {
-  # Print git-info part when inside a git working copy
-  [[ -n ${git_info} ]] && print -n " ${(e)git_info[color]}${(e)git_info[prompt]}"
-}
-
-function zle-line-init zle-keymap-select {
-  # Reset prompt when the keymap changes
-  zle reset-prompt
-  zle -R
+prompt_purinimal_preexec() {
+  # Disallow python VIRTUAL_ENV from updating the prompt, set it to 12 if untouched by the user to
+  # indicate that we modified it. Here we use magic number 12, same as in psvar.
+  export VIRTUAL_ENV_DISABLE_PROMPT=${VIRTUAL_ENV_DISABLE_PROMPT:-12}
 }
 
 prompt_purinimal_precmd() {
-  # Prevent field splitting to be performed on unquoted parameter expansion
   setopt localoptions noshwordsplit
 
-  # Fetch git info
-  (( ${+functions[git-info]} )) && git-info
+  # Build the prepromt parts
+  local preprompt_env=$(purinimal_preprompt_env)
+  local preprompt_git=$(purinimal_preprompt_git)
+  local preprompt_path=$(purinimal_preprompt_path ${preprompt_env} ${preprompt_git})
+  local preprompt_padding=$(purinimal_preprompt_padding ${preprompt_env} ${preprompt_path} ${preprompt_git})
 
-  # Store name of virtualenv in psvar if activated
-  psvar[12]=
-  [[ -n ${VIRTUAL_ENV} ]] && psvar[12]="${VIRTUAL_ENV:t}"
-
-  # For calculating the lengt of a string without prompt escape sequences
-  local zero='%([BSUbfksu]|([FK]|){*})'
-
-  local pp_left pp_left_length
-  local pp_padding
-  local pp_right pp_right_length
-
-  # Build right part first
-  pp_right=$(pp_git)
-  pp_right_length=${#${(S%%)pp_right//$~zero/}}
-
-  # Build hostinfo part (left), add space unless empty
-  pp_left_hostinfo=$(pp_hostinfo)
-  pp_left_hostinfo_length=${#${(S%%)pp_left_hostinfo//$~zero/}}
-
-  # Build path part (left), truncate when needed
-  pp_left_path="%$((COLUMNS-${pp_left_hostinfo_length}-3-${pp_right_length}))<…<%~%<<"
-
-  # Combine hostinfo and path parts into the full left part
-  pp_left="${pp_left_hostinfo}%F{blue}${pp_left_path}%f"
-  pp_left_length=${#${(S%%)pp_left//$~zero/}}
-
-  # Build padding between left and right parts
-  pp_padding=${(r:$((COLUMNS-${pp_left_length}-${pp_right_length})):)}
-
-  # Combine all parts into the full line
-  local pp_full_line="${pp_left}${pp_padding}${pp_right}"
-
-  # When the prompt contains newlines, we keep everything before the first and after the last newline,
-  # leaving us with everything except the preprompt. This is needed because some software prefixes the
-  # prompt (e.g. virtualenv).
-  local pp_cleaned_ps1=${PROMPT}
-  local -H MATCH
-  if [[ ${PROMPT} = *$prompt_newline* ]]; then
-    pp_cleaned_ps1=${PROMPT%%${prompt_newline}*}${PROMPT##*${prompt_newline}}
+  # Remove everything from the prompt until the newline. This removes the preprompt and only the
+  # original PROMPT remains.
+  local cleaned_ps1=${PROMPT}
+  local -H MATCH MBEGIN MEND
+  if [[ ${PROMPT} = *${prompt_newline}* ]]; then
+    cleaned_ps1=${PROMPT##*${prompt_newline}}
   fi
+  unset MATCH MBEGIN MEND
 
-  # Construct the new prompt with a clean preprompt
+  # Construct the new prompt with a clean preprompt.
   local -ah ps1
   ps1=(
+    "${preprompt_env}${preprompt_path}${preprompt_padding}${preprompt_git}"
     ${prompt_newline}
-    ${pp_full_line}
-    ${prompt_newline}
-    ${pp_cleaned_ps1}
+    ${cleaned_ps1}
   )
 
   PROMPT="${(j..)ps1}"
+
+  # Initial newline, for spaciousness.
+  print
 }
 
 prompt_purinimal_setup() {
-  # Prevent field splitting to be performed on unquoted parameter expansion
-  setopt localoptions noshwordsplit
+  # Prevent percentage showing up if output doesn't end with a newline.
+  export PROMPT_EOL_MARK=""
 
-  # Prevent percentage showing up if output doesn't end with a newline
-  export PROMPT_EOL_MARK=''
-
-  # Disallow python virtualenvs from updating the prompt
-  export VIRTUAL_ENV_DISABLE_PROMPT=1
-
-  # Borrowed from promptinit, sets the prompt options in case pure was not initialized via promptinit
+  # Borrowed from promptinit, sets the prompt options in case pure was not initialized via
+  # promptinit.
   prompt_opts=(subst percent)
   setopt noprompt{bang,cr,percent,subst} "prompt${^prompt_opts[@]}"
 
@@ -143,15 +184,18 @@ prompt_purinimal_setup() {
     typeset -g prompt_newline=$'\n%{\r%}'
   fi
 
-  # zle -N zle-line-init
-  # zle -N zle-keymap-select
+  # Load modules.
+  zmodload zsh/zle
+  zmodload zsh/parameter
 
   autoload -Uz colors && colors
   autoload -Uz add-zsh-hook
 
+  # Initialize hooks.
   add-zsh-hook precmd prompt_purinimal_precmd
+  add-zsh-hook preexec prompt_purinimal_preexec
 
-  # Configure git info
+  # Configure git info.
   zstyle ':zim:git-info:action:bisect'               format 'B'
   zstyle ':zim:git-info:action:apply'                format 'A'
   zstyle ':zim:git-info:action:cherry-pick'          format 'C'
@@ -174,8 +218,9 @@ prompt_purinimal_setup() {
 
   zstyle ':zim:git-info:keys' format 'prompt' '%C%b%c%s%B%A%i%I%u%S'
 
-  PROMPT="$(pp_user)$(pp_jobs)$(pp_vimode)$(pp_status)%f "
-  unset RPROMPT
+  # Display the prompt
+  PROMPT="$(purinimal_mark_user)$(purinimal_mark_jobs)$(purinimal_mark_vimode)$(purinimal_mark_exitcode)%f "
+  RPROMPT=
 }
 
 prompt_purinimal_setup "$@"
