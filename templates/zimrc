@@ -9,8 +9,22 @@
 # Select what modules you would like enabled.
 # The second line of modules may depend on options set by modules in the first
 # line. These dependencies are noted on the respective module's README.md.
-zmodules=(directory environment git git-info history input utility custom \
-          prompt completion syntax-highlighting history-substring-search )
+zmodules=(
+  directory
+  environment
+  git
+  git-info
+  history
+  input
+  utility
+  archive
+  pacman
+  custom
+  prompt
+  completion
+  fast-syntax-highlighting
+  history-search-multi-word
+)
 
 
 ###################
@@ -22,7 +36,7 @@ zmodules=(directory environment git git-info history input utility custom \
 #
 
 # Set your desired prompt here
-zprompt_theme='steeef'
+zprompt_theme='purinimal'
 
 #
 # Completion
@@ -48,7 +62,7 @@ zprompt_theme='steeef'
 #
 
 # Set the string below to the desired terminal title format string.
-# The terminal title is redrawn upon directory change, however, variables like 
+# The terminal title is redrawn upon directory change, however, variables like
 # ${PWD} are only evaluated once. Use prompt expansion strings for dynamic data:
 #   http://zsh.sourceforge.net/Doc/Release/Prompt-Expansion.html#Simple-Prompt-Escapes
 # The example below uses the following format: 'username@host:/current/directory'
@@ -74,7 +88,7 @@ zinput_mode='emacs'
 #   https://github.com/zsh-users/zsh-syntax-highlighting/blob/master/docs/highlighters.md
 # For (u)rxvt, termite and gnome-terminal users,
 # removing the 'cursor' highlighter will fix the disappearing cursor problem
-zhighlighters=(main brackets cursor)
+#zhighlighters=(main brackets)
 
 #
 # SSH
@@ -88,9 +102,39 @@ zhighlighters=(main brackets cursor)
 #
 
 # Set (optional) pacman front-end.
-#zpacman_frontend='powerpill'
+zpacman_frontend='pacaur'
 
 # Load any helper scripts as defined here
 #zpacman_helper=(aur)
 
+#
+# Git
+#
 
+# Ignore Submodules
+zstyle ':zim:git-info' ignore-submodules 'all'
+
+# Verbose Mode
+zstyle ':zim:git-info' verbose yes
+
+#
+# History search multi-word
+#
+
+# Number of entries to show (default is $LINES/3)
+zstyle ":history-search-multi-word" page-size "${LINES}/3"
+
+# Color in which to highlight matched, searched text (default bg=17 on 256-color terminals)
+zstyle ":history-search-multi-word" highlight-color "bg=magenta,fg=white,bold"
+
+# Whether to perform syntax highlighting (default true)
+zstyle ":plugin:history-search-multi-word" synhl "yes"
+
+# Effect on active history entry. Try: standout, bold, bg=blue (default underline)
+zstyle ":plugin:history-search-multi-word" active "underline"
+
+# Whether to check paths for existence and mark with magenta (default true)
+zstyle ":plugin:history-search-multi-word" check-paths "yes"
+
+# Whether pressing Ctrl-C or ESC should clear entered query
+zstyle ":plugin:history-search-multi-word" clear-on-cancel "no"
