@@ -6,6 +6,10 @@
 # ensure that 'custom' exists in the zmodules array in your .zimrc
 
 
+# Add Composer (PHP) and yarn (JS) binaries to the path
+export PATH=${PATH}:/home/jasper/.config/composer/vendor/bin
+export PATH=${PATH}:/home/jasper/.config/yarn/global/node_modules/.bin
+
 # Don't share history between terminals
 unsetopt SHARE_HISTORY
 
