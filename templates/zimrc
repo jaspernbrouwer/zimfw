@@ -102,7 +102,7 @@ zinput_mode='emacs'
 #
 
 # Set (optional) pacman front-end.
-zpacman_frontend='pacaur'
+zpacman_frontend='yay'
 
 # Load any helper scripts as defined here
 #zpacman_helper=(aur)
