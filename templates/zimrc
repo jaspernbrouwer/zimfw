@@ -122,7 +122,7 @@ zstyle ':zim:git-info' verbose yes
 #
 
 # Number of entries to show (default is $LINES/3)
-zstyle ":history-search-multi-word" page-size "${LINES}/3"
+zstyle ":history-search-multi-word" page-size "${LINES}/4"
 
 # Color in which to highlight matched, searched text (default bg=17 on 256-color terminals)
 zstyle ":history-search-multi-word" highlight-color "bg=magenta,fg=white,bold"
