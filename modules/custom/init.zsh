@@ -31,3 +31,6 @@ alias _="sudo "
 # Base16 shell
 local BASE16_SHELL="${ZDOTDIR:-$HOME}/.config/base16-shell/"
 [ -n "$PS1" ] && [ -s "$BASE16_SHELL/profile_helper.sh" ] && eval "$("$BASE16_SHELL/profile_helper.sh")"
+
+# Gnome Terminal tabs/windows keep the parent current directory
+[ -e /etc/profile.d/vte.sh ] && . /etc/profile.d/vte.sh
