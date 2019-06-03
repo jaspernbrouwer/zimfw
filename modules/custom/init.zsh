@@ -10,6 +10,10 @@
 export PATH=${PATH}:/home/jasper/.config/composer/vendor/bin
 export PATH=${PATH}:/home/jasper/.config/yarn/global/node_modules/.bin
 
+# Set Composer's home- and cache-dir to known locations
+export COMPOSER_HOME=${ZDOTDIR:-${HOME}}/.composer
+export COMPOSER_CACHE_DIR=${COMPOSER_HOME}/cache
+
 # Don't share history between terminals
 unsetopt SHARE_HISTORY
 
